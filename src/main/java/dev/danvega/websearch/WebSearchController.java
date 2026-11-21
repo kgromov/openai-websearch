@@ -1,15 +1,16 @@
 package dev.danvega.websearch;
 
-import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+@RequestMapping("/spring-ai")
 @RestController
 public class WebSearchController {
 
@@ -141,7 +142,7 @@ public class WebSearchController {
                         
                         But you MUST return exactly 3 recommendations.
                         """,
-                cuisine.equals("any") ? "any" : cuisine,
+                cuisine,
                 getPriceRangeDescription(priceRange));
 
         String userPrompt = String.format("""
