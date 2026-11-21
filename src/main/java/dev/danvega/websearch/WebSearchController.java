@@ -1,14 +1,14 @@
 package dev.danvega.websearch;
 
+import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.ai.openai.api.OpenAiApi.ChatCompletionRequest.WebSearchOptions;
-import org.springframework.ai.openai.api.OpenAiApi.ChatCompletionRequest.WebSearchOptions.SearchContextSize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 public class WebSearchController {
@@ -16,91 +16,79 @@ public class WebSearchController {
     private final ChatClient chatClient;
 
     public WebSearchController() {
-        String apiKey = System.getenv("OPENAI_API_KEY");
-
-        OpenAiChatOptions chatOptions = OpenAiChatOptions.builder()
-                .model("gpt-4o-search-preview")
-                .build();
-
         OpenAiChatModel openAiChatModel = OpenAiChatModel.builder()
-                .openAiApi(OpenAiApi.builder().apiKey(apiKey).build())
-                .defaultOptions(chatOptions)
+                .options(OpenAiChatOptions.builder()
+                        .apiKey(System.getenv("NVIDIA_API_KEY"))
+                        .baseUrl("https://integrate.api.nvidia.com/v1")
+                        .model("nvidia/nemotron-3.5-lightning-30b-a3b")
+                        .build()
+                )
                 .build();
-
         this.chatClient = ChatClient.builder(openAiChatModel).build();
     }
 
-    @GetMapping("/gpt5")
-    public String gpt5() {
-
-        WebSearchOptions webSearchOptions = new WebSearchOptions(
-                SearchContextSize.LOW,
-                null
-        );
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .webSearchOptions(webSearchOptions)
-                .build();
+    @GetMapping("/nemotron")
+    public String nemotron() {
+        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
+                .extraBody(Map.of("web_search_options",
+                        Map.of("search_context_size", "low"))
+                );
 
         return chatClient.prompt()
-                .user("Tell me an interesting fact about GPT-5")
-                .options(options)
+                .user("Tell me an interesting fact about nemotron-3.5")
+                .options(OpenAiChatOptions.builder())
                 .call()
                 .content();
     }
 
     @GetMapping("/news")
     public String currentNews() {
-        WebSearchOptions webSearchOptions = new WebSearchOptions(
-                WebSearchOptions.SearchContextSize.LOW,
-                null
-        );
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .webSearchOptions(webSearchOptions)
-                .build();
+        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
+                .extraBody(Map.of("web_search_options",
+                        Map.of("search_context_size", "low"))
+                );
 
 
         String systemPrompt = """
-            You are a Spring Framework expert and technical news analyst. Your role is to:
-            
-            1. Search for and identify the most recent and significant developments in the Spring ecosystem
-            2. Focus on official announcements, major releases, security updates, and breaking changes
-            3. Prioritize information from authoritative sources like:
-               - Official Spring blog (spring.io/blog)
-               - GitHub releases and changelogs
-               - Spring team announcements
-               - Major tech publications covering Spring
-            
-            4. Structure your response with:
-               - **Date and Source** for each news item
-               - **Impact Level** (Critical/Major/Minor)
-               - **Brief Summary** in 2-3 sentences
-               - **Action Items** for developers if applicable
-            
-            5. Filter out generic Java news unless directly Spring-related
-            6. If no significant Spring news is found in the last week, expand to the last month
-            7. Always verify information currency - ignore outdated articles
-            
-            Present the information in a clear, scannable format that busy developers can quickly digest.
-            """;
+                You are a Spring Framework expert and technical news analyst. Your role is to:
+                
+                1. Search for and identify the most recent and significant developments in the Spring ecosystem
+                2. Focus on official announcements, major releases, security updates, and breaking changes
+                3. Prioritize information from authoritative sources like:
+                   - Official Spring blog (spring.io/blog)
+                   - GitHub releases and changelogs
+                   - Spring team announcements
+                   - Major tech publications covering Spring
+                
+                4. Structure your response with:
+                   - **Date and Source** for each news item
+                   - **Impact Level** (Critical/Major/Minor)
+                   - **Brief Summary** in 2-3 sentences
+                   - **Action Items** for developers if applicable
+                
+                5. Filter out generic Java news unless directly Spring-related
+                6. If no significant Spring news is found in the last week, expand to the last month
+                7. Always verify information currency - ignore outdated articles
+                
+                Present the information in a clear, scannable format that busy developers can quickly digest.
+                """;
 
         String userPrompt = """
-            Search for the latest Spring Framework ecosystem news from the past 7 days, including:
-            
-            - Spring Boot releases and updates
-            - Spring Security announcements  
-            - Spring Cloud developments
-            - New Spring projects or major updates
-            - Breaking changes or deprecations
-            - Security vulnerabilities and patches
-            - Spring Tools and IDE integration updates
-            - Performance improvements or new features
-            - Community events or important blog posts
-            
-            Focus on news that would impact Spring developers in their daily work.
-            If limited recent news, include significant developments from the past month.
-            """;
+                Search for the latest Spring Framework ecosystem news from the past 7 days, including:
+                
+                - Spring Boot releases and updates
+                - Spring Security announcements  
+                - Spring Cloud developments
+                - New Spring projects or major updates
+                - Breaking changes or deprecations
+                - Security vulnerabilities and patches
+                - Spring Tools and IDE integration updates
+                - Performance improvements or new features
+                - Community events or important blog posts
+                
+                Focus on news that would impact Spring developers in their daily work.
+                If limited recent news, include significant developments from the past month.
+                """;
 
         return chatClient.prompt()
                 .system(systemPrompt)
@@ -118,57 +106,55 @@ public class WebSearchController {
                                   @RequestParam(defaultValue = "US") String country,
                                   @RequestParam(defaultValue = "America/New_York") String timezone) {
 
-        // Set user location using WebSearchOptions
-        WebSearchOptions.UserLocation userLocation = new WebSearchOptions.UserLocation(
-                "approximate",
-                new WebSearchOptions.UserLocation.Approximate(city, country, region, timezone)
-        );
+        Map<String, Object> webSearchOptions = Map.of(
+                "search_context_size", "medium",
+                "user_location", Map.of(
+                        "type", "approximate",
+                        "approximate", Map.of(
+                                "city", city,
+                                "region", region,
+                                "country", country,
+                                "timezone", timezone)));
 
-        WebSearchOptions webSearchOptions = new WebSearchOptions(
-                WebSearchOptions.SearchContextSize.MEDIUM, // Reduced from HIGH for faster response
-                userLocation
-        );
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .webSearchOptions(webSearchOptions)
-                .build();
+        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
+                .extraBody(Map.of("web_search_options", webSearchOptions));
 
         String systemPrompt = String.format("""
-        You are a local restaurant expert. You MUST provide exactly 3 restaurant recommendations - no more, no less.
-        
-        **CRITICAL REQUIREMENTS:**
-        - Return exactly 3 restaurants (never 1, 2, or more than 3)
-        - All restaurants must be currently OPEN and accepting customers
-        - All must match: %s cuisine and %s price range
-        - All must have recent positive reviews
-        
-        **Response Format for each of the 3 restaurants:**
-        **Restaurant Name** - Neighborhood
-        **Specialty** - What they're famous for
-        **Price & Rating** - Price range and rating
-        **Status & Contact** - Current hours and reservation info
-        
-        If you cannot find 3 restaurants that meet the exact criteria, expand your search to include:
-        1. Nearby neighborhoods
-        2. Slightly broader cuisine categories
-        3. Adjacent price ranges
-        
-        But you MUST return exactly 3 recommendations.
-        """,
+                        You are a local restaurant expert. You MUST provide exactly 3 restaurant recommendations - no more, no less.
+                        
+                        **CRITICAL REQUIREMENTS:**
+                        - Return exactly 3 restaurants (never 1, 2, or more than 3)
+                        - All restaurants must be currently OPEN and accepting customers
+                        - All must match: %s cuisine and %s price range
+                        - All must have recent positive reviews
+                        
+                        **Response Format for each of the 3 restaurants:**
+                        **Restaurant Name** - Neighborhood
+                        **Specialty** - What they're famous for
+                        **Price & Rating** - Price range and rating
+                        **Status & Contact** - Current hours and reservation info
+                        
+                        If you cannot find 3 restaurants that meet the exact criteria, expand your search to include:
+                        1. Nearby neighborhoods
+                        2. Slightly broader cuisine categories
+                        3. Adjacent price ranges
+                        
+                        But you MUST return exactly 3 recommendations.
+                        """,
                 cuisine.equals("any") ? "any" : cuisine,
                 getPriceRangeDescription(priceRange));
 
         String userPrompt = String.format("""
-        I need exactly 3 %s restaurant recommendations near me in the %s price range.
-        
-        **Requirements:**
-        - All 3 must be currently OPEN (not closed)
-        - All 3 must be accepting customers today
-        - All 3 should have good recent reviews
-        - Give me practical info: address, hours, phone, reservation needs
-        
-        **Important:** I need exactly 3 options - please don't give me fewer than 3 restaurants.
-        """,
+                        I need exactly 3 %s restaurant recommendations near me in the %s price range.
+                        
+                        **Requirements:**
+                        - All 3 must be currently OPEN (not closed)
+                        - All 3 must be accepting customers today
+                        - All 3 should have good recent reviews
+                        - Give me practical info: address, hours, phone, reservation needs
+                        
+                        **Important:** I need exactly 3 options - please don't give me fewer than 3 restaurants.
+                        """,
                 cuisine.equals("any") ? "great" : cuisine,
                 getPriceRangeDescription(priceRange));
 
