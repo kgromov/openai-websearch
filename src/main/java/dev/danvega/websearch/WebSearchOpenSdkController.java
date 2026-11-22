@@ -1,19 +1,18 @@
 package dev.danvega.websearch;
 
 import com.openai.client.OpenAIClient;
-import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseOutputText;
 import com.openai.models.responses.WebSearchTool;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Duration;
-
+@Profile("open-sdk")
 @RequestMapping("/openai-sdk")
 @RestController
 public class WebSearchOpenSdkController {
@@ -22,12 +21,8 @@ public class WebSearchOpenSdkController {
 
     private final OpenAIClient client;
 
-    public WebSearchOpenSdkController() {
-        this.client = OpenAIOkHttpClient.builder()
-                .apiKey(System.getenv("NVIDIA_API_KEY"))
-                .baseUrl("https://integrate.api.nvidia.com/v1")
-                .timeout(Duration.ofSeconds(90))
-                .build();
+    public WebSearchOpenSdkController(OpenAIClient client) {
+        this.client = client;
     }
 
     @GetMapping("/nemotron")

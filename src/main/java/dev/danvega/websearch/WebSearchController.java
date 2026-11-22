@@ -1,7 +1,6 @@
 package dev.danvega.websearch;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,16 +15,8 @@ public class WebSearchController {
 
     private final ChatClient chatClient;
 
-    public WebSearchController() {
-        OpenAiChatModel openAiChatModel = OpenAiChatModel.builder()
-                .options(OpenAiChatOptions.builder()
-                        .apiKey(System.getenv("NVIDIA_API_KEY"))
-                        .baseUrl("https://integrate.api.nvidia.com/v1")
-                        .model("nvidia/nemotron-3.5-lightning-30b-a3b")
-                        .build()
-                )
-                .build();
-        this.chatClient = ChatClient.builder(openAiChatModel).build();
+    public WebSearchController(ChatClient chatClient) {
+        this.chatClient = chatClient;
     }
 
     @GetMapping("/nemotron")
