@@ -1,7 +1,10 @@
 package dev.danvega.websearch;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,47 +43,8 @@ public class WebSearchController {
                         Map.of("search_context_size", "low"))
                 );
 
-
-        String systemPrompt = """
-                You are a Spring Framework expert and technical news analyst. Your role is to:
-                
-                1. Search for and identify the most recent and significant developments in the Spring ecosystem
-                2. Focus on official announcements, major releases, security updates, and breaking changes
-                3. Prioritize information from authoritative sources like:
-                   - Official Spring blog (spring.io/blog)
-                   - GitHub releases and changelogs
-                   - Spring team announcements
-                   - Major tech publications covering Spring
-                
-                4. Structure your response with:
-                   - **Date and Source** for each news item
-                   - **Impact Level** (Critical/Major/Minor)
-                   - **Brief Summary** in 2-3 sentences
-                   - **Action Items** for developers if applicable
-                
-                5. Filter out generic Java news unless directly Spring-related
-                6. If no significant Spring news is found in the last week, expand to the last month
-                7. Always verify information currency - ignore outdated articles
-                
-                Present the information in a clear, scannable format that busy developers can quickly digest.
-                """;
-
-        String userPrompt = """
-                Search for the latest Spring Framework ecosystem news from the past 7 days, including:
-                
-                - Spring Boot releases and updates
-                - Spring Security announcements  
-                - Spring Cloud developments
-                - New Spring projects or major updates
-                - Breaking changes or deprecations
-                - Security vulnerabilities and patches
-                - Spring Tools and IDE integration updates
-                - Performance improvements or new features
-                - Community events or important blog posts
-                
-                Focus on news that would impact Spring developers in their daily work.
-                If limited recent news, include significant developments from the past month.
-                """;
+        var systemPrompt = new ClassPathResource("prompts/news-system.st");
+        var userPrompt = new ClassPathResource("prompts/news-user.st");
 
         return chatClient.prompt()
                 .system(systemPrompt)
@@ -111,48 +75,20 @@ public class WebSearchController {
         OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
                 .extraBody(Map.of("web_search_options", webSearchOptions));
 
-        String systemPrompt = String.format("""
-                        You are a local restaurant expert. You MUST provide exactly 3 restaurant recommendations - no more, no less.
-                        
-                        **CRITICAL REQUIREMENTS:**
-                        - Return exactly 3 restaurants (never 1, 2, or more than 3)
-                        - All restaurants must be currently OPEN and accepting customers
-                        - All must match: %s cuisine and %s price range
-                        - All must have recent positive reviews
-                        
-                        **Response Format for each of the 3 restaurants:**
-                        **Restaurant Name** - Neighborhood
-                        **Specialty** - What they're famous for
-                        **Price & Rating** - Price range and rating
-                        **Status & Contact** - Current hours and reservation info
-                        
-                        If you cannot find 3 restaurants that meet the exact criteria, expand your search to include:
-                        1. Nearby neighborhoods
-                        2. Slightly broader cuisine categories
-                        3. Adjacent price ranges
-                        
-                        But you MUST return exactly 3 recommendations.
-                        """,
-                cuisine,
-                getPriceRangeDescription(priceRange));
-
-        String userPrompt = String.format("""
-                        I need exactly 3 %s restaurant recommendations near me in the %s price range.
-                        
-                        **Requirements:**
-                        - All 3 must be currently OPEN (not closed)
-                        - All 3 must be accepting customers today
-                        - All 3 should have good recent reviews
-                        - Give me practical info: address, hours, phone, reservation needs
-                        
-                        **Important:** I need exactly 3 options - please don't give me fewer than 3 restaurants.
-                        """,
-                cuisine.equals("any") ? "great" : cuisine,
-                getPriceRangeDescription(priceRange));
-
-        return chatClient.prompt()
-                .system(systemPrompt)
-                .user(userPrompt)
+        var systemPrompt = SystemMessage.builder()
+                .text(new ClassPathResource("prompts/restaurants-system.st"))
+                .build();
+        var userPrompt = SystemMessage.builder()
+                .text(new ClassPathResource("prompts/restaurants-user.st"))
+                .build();
+        Map<String, Object> params = Map.of(
+                "cuisine", cuisine,
+                "price", this.getPriceRangeDescription(priceRange)
+        );
+        return chatClient.prompt(Prompt.builder().messages(systemPrompt, userPrompt).build())
+                .system(sp -> sp.params(params))
+                .user(up -> up.params(params))
+//                .user(new ClassPathResource("prompts/restaurants-user.st").getContentAsString(StandardCharsets.UTF_8).formatted(cuisine, this.getPriceRangeDescription(priceRange)))
                 .options(options)
                 .call()
                 .content();
